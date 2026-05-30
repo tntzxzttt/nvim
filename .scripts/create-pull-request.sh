@@ -32,7 +32,7 @@ fi
 
 # Check the commit messages
 while IFS= read -r msg; do
-  ./scripts/check-commit-msg.sh "$msg"
+  ./.scripts/check-commit-msg.sh "$msg"
 done < <(git log "$BASE..$HEAD" --format=%s)
 
 # Confirm the pull request title and body before creating the pull request.
