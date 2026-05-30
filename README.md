@@ -32,3 +32,21 @@ require("lazy").setup({
   -- ... existing config
 })
 ```
+
+## Development
+
+### Commit Message Format
+
+This repository uses [Lefthook](https://lefthook.dev/)
+to run pre-commit hooks that check commit messages for compliance with
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+
+So you need to install Lefthook and set up the hooks before committing:
+
+```sh
+brew install lefthook
+cd ~/.config/nvim
+lefthook install
+```
+
+Don't forget to update `valid_scopes` in `.scripts/check-commit-msg.sh` when adding new configuration files or plugin modules.
