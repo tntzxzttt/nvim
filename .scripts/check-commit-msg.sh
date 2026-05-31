@@ -33,6 +33,7 @@ valid_scopes=(
   "plugins"
   # lua/config/<name>.lua
   "autocmds"
+  "commands"
   "keymaps"
   "options"
 )
