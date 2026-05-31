@@ -56,4 +56,4 @@ cd ~/.config/nvim
 lefthook install
 ```
 
-Don't forget to update `valid_scopes` in `.scripts/check-commit-msg.sh` when adding new configuration files or plugin modules.
+Don't forget to update `valid_scopes` in `scripts/check-commit-msg.sh` when adding new configuration files or plugin modules.

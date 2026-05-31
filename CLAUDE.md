@@ -61,7 +61,7 @@ Examples:
 Run the following script:
 
 ```sh
-./.scripts/create-pull-request.sh N
+./scripts/create-pull-request.sh N
 ```
 
 **If not linked to an issue:**
