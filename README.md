@@ -33,6 +33,13 @@ require("lazy").setup({
 })
 ```
 
+## Enable GitHub Copilot
+
+```text
+:Copilot auth signin
+:Copilot auth signout
+```
+
 ## Development
 
 ### Commit Message Format
