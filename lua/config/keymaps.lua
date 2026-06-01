@@ -73,6 +73,32 @@ keymap.set("n", "<C-'>", function()
   require("gitsigns").nav_hunk("next")
 end)
 
+-- Copy file path reference for Claude Code and the like (e.g. "@lua/config/keymaps.lua")
+keymap.set("n", "ll", function()
+  local ref = "@" .. vim.fn.expand("%:.")
+  vim.fn.setreg("+", ref)
+  vim.notify("Copied: " .. ref)
+end, { desc = "Copy file path reference to clipboard" })
+
+-- Copy file path and line range reference for Claude Code and the like (e.g. "@lua/config/keymaps.lua:10-20")
+keymap.set("v", "ll", function()
+  local start_line = vim.fn.line("v")
+  local end_line = vim.fn.line(".")
+  if start_line > end_line then
+    start_line, end_line = end_line, start_line
+  end
+  local filepath = vim.fn.expand("%:.")
+  local ref
+  if start_line == end_line then
+    ref = "@" .. filepath .. ":" .. start_line
+  else
+    ref = "@" .. filepath .. ":" .. start_line .. "-" .. end_line
+  end
+  vim.fn.setreg("+", ref)
+  vim.notify("Copied: " .. ref)
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
+end, { desc = "Copy file:line reference to clipboard" })
+
 -- Plugin: Comment (comment in / comment out)
 keymap.set("n", "<C-/>", function()
   require("Commnet.api").toggle.linewise.current()
