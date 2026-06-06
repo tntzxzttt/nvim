@@ -10,23 +10,22 @@ return {
     opts = {
       servers = {
         basedpyright = {
-          -- before_init fires just before the LSP server starts, giving us the
-          -- LSP-resolved project root (params.rootPath) rather than just cwd.
-          -- We use it to inject pythonPath so basedpyright uses the venv
-          -- interpreter before it attempts any import resolution.
-          before_init = function(params, config)
-            local root = params.rootPath or vim.fn.getcwd()
-            local python = root .. "/.venv/bin/python"
-            if vim.fn.executable(python) == 1 then
-              config.settings = vim.tbl_deep_extend("force", config.settings or {}, {
+          -- on_new_config runs after nvim-lspconfig builds the server config but
+          -- before the LSP client starts.  Unlike before_init, modifications to
+          -- new_config.settings here are guaranteed to reach the server in the
+          -- initial workspace/configuration payload.
+          on_new_config = function(new_config, root_dir)
+            local python = root_dir .. "/.venv/bin/python"
+            if vim.uv.fs_stat(python) then
+              new_config.settings = vim.tbl_deep_extend("force", new_config.settings or {}, {
                 python = { pythonPath = python },
               })
             end
           end,
           settings = {
             python = {
-              -- Declarative fallback: even without before_init firing, pyright
-              -- will resolve stubs/packages from .venv in the workspace root.
+              -- Declarative fallback: tells basedpyright where to look for a
+              -- venv even when on_new_config does not find one.
               venvPath = ".",
               venv = ".venv",
             },
