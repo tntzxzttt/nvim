@@ -97,14 +97,34 @@ return {
     },
   },
 
-  -- Add mypy for deep type checking (ruff's type checks are intentionally
-  -- limited; mypy gives full PEP 484 inference).
+  -- Enable mypy only when the project has mypy configuration.
+  -- Without config, mypy's defaults are too noisy and the project likely
+  -- relies on basedpyright alone for type checking.
   {
     "mfussenegger/nvim-lint",
-    opts = {
-      linters_by_ft = {
-        python = { "mypy" },
-      },
-    },
+    opts = function(_, opts)
+      local has_mypy_config = vim.fs.find({
+        "mypy.ini",
+        ".mypy.ini",
+      }, { path = vim.fn.getcwd(), upward = true })[1]
+        or (function()
+          local pyproject = vim.fs.find("pyproject.toml", { path = vim.fn.getcwd(), upward = true })[1]
+          if not pyproject then
+            return false
+          end
+          local content = vim.fn.readfile(pyproject)
+          for _, line in ipairs(content) do
+            if line:match("^%[tool%.mypy") then
+              return true
+            end
+          end
+          return false
+        end)()
+
+      if has_mypy_config then
+        opts.linters_by_ft = opts.linters_by_ft or {}
+        opts.linters_by_ft.python = { "mypy" }
+      end
+    end,
   },
 }
