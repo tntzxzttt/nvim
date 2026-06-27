@@ -74,14 +74,14 @@ keymap.set("n", "<C-'>", function()
 end)
 
 -- Copy file path reference for Claude Code and the like (e.g. "@lua/config/keymaps.lua")
-keymap.set("n", "ll", function()
+keymap.set("n", "yf", function()
   local ref = "@" .. vim.fn.expand("%:.")
   vim.fn.setreg("+", ref)
   vim.notify("Copied: " .. ref)
 end, { desc = "Copy file path reference to clipboard" })
 
--- Copy file path and line range reference for Claude Code and the like (e.g. "@lua/config/keymaps.lua:10-20")
-keymap.set("v", "ll", function()
+keymap.set("v", "yl", function()
+  -- Copy file path and line range reference for Claude Code and the like (e.g. "@lua/config/keymaps.lua:10-20")
   local start_line = vim.fn.line("v")
   local end_line = vim.fn.line(".")
   if start_line > end_line then
