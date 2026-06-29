@@ -6,6 +6,12 @@ pre-commit:
   commands:
     prevent-main-commit:
       run: .githooks/protect-main-branch.sh commit
+    reconcile-lazy-lock:
+      glob: "lua/plugins/*.lua"
+      run: |
+        nvim --headless "+Lazy! clean" +qa
+        nvim --headless "+Lazy! install" +qa
+        git add lazy-lock.json
 
 commit-msg:
   commands:
