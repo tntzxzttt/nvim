@@ -73,31 +73,33 @@ keymap.set("n", "<C-'>", function()
   require("gitsigns").nav_hunk("next")
 end)
 
--- Copy file path reference for Claude Code and the like (e.g. "@lua/config/keymaps.lua")
-keymap.set("n", "yf", function()
-  local ref = "@" .. vim.fn.expand("%:.")
-  vim.fn.setreg("+", ref)
-  vim.notify("Copied: " .. ref)
-end, { desc = "Copy file path reference to clipboard" })
-
-keymap.set("v", "yl", function()
-  -- Copy file path and line range reference for Claude Code and the like (e.g. "@lua/config/keymaps.lua:10-20")
-  local start_line = vim.fn.line("v")
-  local end_line = vim.fn.line(".")
-  if start_line > end_line then
-    start_line, end_line = end_line, start_line
-  end
+-- Copy file path reference for Claude Code and the like
+-- Normal: "@lua/config/keymaps.lua"
+-- Visual: "@lua/config/keymaps.lua:10-20"
+keymap.set({ "n", "v" }, "yc", function()
   local filepath = vim.fn.expand("%:.")
-  local ref
-  if start_line == end_line then
-    ref = "@" .. filepath .. ":" .. start_line
+  local mode = vim.fn.mode()
+  if mode == "v" or mode == "V" or mode == "\22" then
+    local start_line = vim.fn.line("v")
+    local end_line = vim.fn.line(".")
+    if start_line > end_line then
+      start_line, end_line = end_line, start_line
+    end
+    local ref
+    if start_line == end_line then
+      ref = "@" .. filepath .. ":" .. start_line
+    else
+      ref = "@" .. filepath .. ":" .. start_line .. "-" .. end_line
+    end
+    vim.fn.setreg("+", ref)
+    vim.notify("Copied: " .. ref)
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
   else
-    ref = "@" .. filepath .. ":" .. start_line .. "-" .. end_line
+    local ref = "@" .. filepath
+    vim.fn.setreg("+", ref)
+    vim.notify("Copied: " .. ref)
   end
-  vim.fn.setreg("+", ref)
-  vim.notify("Copied: " .. ref)
-  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
-end, { desc = "Copy file:line reference to clipboard" })
+end, { desc = "Copy file path reference to clipboard" })
 
 -- Plugin: Comment (comment in / comment out)
 keymap.set("n", "<C-/>", function()
