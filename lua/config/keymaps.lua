@@ -38,6 +38,7 @@ keymap.set("n", "<tab>", ":tabnext<Return>", opts)
 keymap.set("n", "<S-tab>", ":tabprev<Return>", opts)
 
 -- Buffer
+keymap.set("n", "<C-c>", "<cmd>Bdelete<CR>", { desc = "Delete buffer without changing window layout" })
 keymap.set("n", "<C-]>", ":bnext<Return>", opts)
 keymap.set("n", "<C-[>", ":bprev<Return>", opts)
 

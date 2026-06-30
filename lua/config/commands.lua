@@ -35,8 +35,11 @@ end, {
 })
 
 -- Built-in lowercase commands can't be replaced directly,
--- so redirect exact command-line uses of :bd/:bdelete to the layout-preserving variant instead.
+-- so redirect exact command-line uses of :c/:bd/:bdelete to the layout-preserving variant instead.
+-- :c stands for "close" and overrides the built-in :change command.
 vim.cmd([[cnoreabbrev <expr> bd getcmdtype() == ':' && getcmdline() ==# 'bd' ? 'Bdelete' : 'bd']])
 vim.cmd([[cnoreabbrev <expr> bd! getcmdtype() == ':' && getcmdline() ==# 'bd!' ? 'Bdelete!' : 'bd!']])
 vim.cmd([[cnoreabbrev <expr> bdelete getcmdtype() == ':' && getcmdline() ==# 'bdelete' ? 'Bdelete' : 'bdelete']])
 vim.cmd([[cnoreabbrev <expr> bdelete! getcmdtype() == ':' && getcmdline() ==# 'bdelete!' ? 'Bdelete!' : 'bdelete!']])
+vim.cmd([[cnoreabbrev <expr> c getcmdtype() == ':' && getcmdline() ==# 'c' ? 'Bdelete' : 'c']])
+vim.cmd([[cnoreabbrev <expr> c! getcmdtype() == ':' && getcmdline() ==# 'c!' ? 'Bdelete!' : 'c!']])
