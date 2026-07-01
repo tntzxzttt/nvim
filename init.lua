@@ -7,6 +7,19 @@ vim.api.nvim_set_hl(0, "SnacksPickerDir", { link = "Text" })
 vim.api.nvim_set_hl(0, "SnacksPickerPathHidden", { link = "Text" })
 vim.api.nvim_set_hl(0, "SnacksPickerGitStatusUntracked", { link = "Special" })
 
+-- Automatically reload Snacks Explorer tree when the explorer window gains focus.
+-- NOTE: This relies on the internal snacks.explorer.tree API, which may break on updates.
+vim.api.nvim_create_autocmd("BufEnter", {
+  callback = function()
+    if vim.bo.filetype == "snacks_picker_list" then
+      local ok, Tree = pcall(require, "snacks.explorer.tree")
+      if ok then
+        Tree:refresh(vim.fn.getcwd())
+      end
+    end
+  end,
+})
+
 -- Automatically reload a file when it is changed outside of Neovim.
 vim.o.autoread = true
 
