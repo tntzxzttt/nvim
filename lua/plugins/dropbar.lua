@@ -23,6 +23,14 @@ return {
 
       return {
         bar = {
+          enable = function(buf, win, _)
+            return vim.api.nvim_buf_is_valid(buf)
+              and vim.api.nvim_win_is_valid(win)
+              and vim.fn.win_gettype(win) == ""
+              and vim.wo[win].winbar == ""
+              and vim.bo[buf].bt == ""
+              and vim.api.nvim_buf_get_name(buf) ~= ""
+          end,
           sources = function(buf, _)
             local utils = require("dropbar.utils")
 
