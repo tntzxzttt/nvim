@@ -14,7 +14,9 @@ return {
           local symbols = sources.path.get_symbols(buf, win, cursor)
 
           if symbols and #symbols > 0 then
-            symbols[#symbols].name_hl = "DropBarFileNameBold"
+            local filename = symbols[#symbols]
+            filename.name_hl = "DropBarFileNameBold"
+            filename.min_width = vim.fn.strchars(filename.name)
           end
 
           return symbols
