@@ -59,3 +59,13 @@ lefthook install
 ```
 
 Don't forget to update `valid_scopes` in `scripts/check-commit-msg.sh` when adding new configuration files or plugin modules.
+
+## Contributions
+
+Thank you for your interest in contributing!
+
+This repository is maintained as a personal development environment and engineering log.
+To preserve the integrity and continuity of its issue and pull request history,
+**I'm not currently accepting external issues or pull requests.**
+
+Please feel free to fork this repository and modify your own copy!
