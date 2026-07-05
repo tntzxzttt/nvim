@@ -69,3 +69,7 @@ To preserve the integrity and continuity of its issue and pull request history,
 **I'm not currently accepting external issues or pull requests.**
 
 Please feel free to fork this repository and modify your own copy!
+
+## License
+
+Licensed under the Apache License 2.0. See [NOTICE](./NOTICE) for attribution details.
