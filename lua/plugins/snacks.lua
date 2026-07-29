@@ -12,6 +12,7 @@ return {
             "**/.git",
             "**/.tmp",
             "**/.DS_Store",
+            "**/*.sock",
           },
           win = {
             list = {
