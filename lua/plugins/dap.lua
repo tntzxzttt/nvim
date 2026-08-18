@@ -7,7 +7,21 @@ return {
   {
     "rcarriga/nvim-dap-ui",
     opts = {
+      -- NOTE: dap-ui opens layouts in REVERSE order of this list. The bottom
+      -- tray is listed first so it opens LAST, as a full-width `botright
+      -- split` below everything. Opened the other way around, the tray splits
+      -- only under the explorer+main group, wrapping the Snacks explorer
+      -- inside a nested column — bufferline then no longer recognises it as
+      -- an edge panel and drops its tabline offset.
       layouts = {
+        {
+          elements = {
+            "repl",
+            "console",
+          },
+          size = 10,
+          position = "bottom",
+        },
         {
           elements = {
             { id = "scopes", size = 0.25 },
@@ -17,14 +31,6 @@ return {
           },
           size = 40,
           position = "right", -- default is "left"
-        },
-        {
-          elements = {
-            "repl",
-            "console",
-          },
-          size = 10,
-          position = "bottom",
         },
       },
     },
