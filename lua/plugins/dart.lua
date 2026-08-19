@@ -25,7 +25,7 @@ return {
   },
 
   {
-    "akinsho/flutter-tools.nvim",
+    "nvim-flutter/flutter-tools.nvim",
     -- flutter-tools registers its :Flutter* user commands inside setup(), which
     -- only runs once the plugin loads. Loading on `ft = "dart"` alone means the
     -- commands don't exist until a Dart buffer is open. Listing them under `cmd`
