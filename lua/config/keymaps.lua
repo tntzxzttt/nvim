@@ -71,6 +71,85 @@ keymap.set("n", "<C-h>", function()
   vim.diagnostic.jump({ count = -1 })
 end, opts)
 
+-- LSP (reload buffers changed on disk, then restart every running client)
+-- Files edited outside Neovim (Bash, Claude Code, git) leave the buffer stale,
+-- and a language server type-checks the buffer contents, not the file on disk --
+-- so a bare restart reports diagnostics for code that no longer exists.
+-- `checktime` reloads such buffers ('autoread' is on by default; a modified
+-- buffer still prompts instead of being discarded). Every running client is
+-- restarted, not only the ones attached to the current buffer, so that the
+-- diagnostics cleared below are all recomputed: `:lsp restart` given client
+-- names restarts those clients process-wide, and a restarted client re-attaches
+-- to every buffer it served.
+keymap.set("n", "<C-S-r>", function()
+  local title = { title = "Reload & LSP restart" }
+
+  -- Collect the buffers `checktime` actually reloads, so the notification says
+  -- what happened rather than only that the mapping fired
+  local reloaded = {}
+  local group = vim.api.nvim_create_augroup("keymaps_reload_lsp_restart", { clear = true })
+  vim.api.nvim_create_autocmd("FileChangedShellPost", {
+    group = group,
+    callback = function(args)
+      local name = vim.api.nvim_buf_get_name(args.buf)
+      table.insert(reloaded, name ~= "" and vim.fn.fnamemodify(name, ":.") or ("[buffer " .. args.buf .. "]"))
+    end,
+  })
+  vim.cmd("checktime")
+  vim.api.nvim_del_augroup_by_id(group)
+
+  local reload_msg = #reloaded > 0 and ("Reloaded: " .. table.concat(reloaded, ", ")) or "No buffer changed on disk"
+
+  -- `:lsp restart` reports an error when nothing is running, and with no client
+  -- left to publish again there is no point in clearing the diagnostics either
+  local pending = {}
+  for _, client in ipairs(vim.lsp.get_clients()) do
+    pending[client.name] = true
+  end
+  local names = vim.tbl_keys(pending)
+  if #names == 0 then
+    vim.notify(reload_msg .. "\nNo LSP client running, nothing to restart", vim.log.levels.WARN, title)
+    return
+  end
+  table.sort(names)
+
+  -- A restarted client gets a new id, hence a new namespace, and the built-in
+  -- cleanup only runs once the old process exits (`_on_detach` via `_on_exit`),
+  -- so clear the namespaces up front instead of leaving stale diagnostics on
+  -- screen until then. Only the LSP ones (`nvim.lsp.<client>.<id>`): nvim-lint
+  -- names its namespace after the linter and has no automatic re-trigger, so
+  -- clearing it would leave a file looking clean until the next write
+  for ns_id, ns in pairs(vim.diagnostic.get_namespaces()) do
+    if ns.name:match("^nvim%.lsp%.") then
+      vim.diagnostic.reset(ns_id)
+    end
+  end
+
+  vim.notify(reload_msg .. "\nRestarting: " .. table.concat(names, ", "), vim.log.levels.INFO, title)
+
+  -- The restart is asynchronous, so report each client as it comes back and
+  -- count them: a count that stops short of the total means one never returned
+  local attach_group = vim.api.nvim_create_augroup("keymaps_reload_lsp_attach", { clear = true })
+  local total, back = #names, 0
+  vim.api.nvim_create_autocmd("LspAttach", {
+    group = attach_group,
+    callback = function(args)
+      local client = vim.lsp.get_client_by_id(args.data.client_id)
+      if not (client and pending[client.name]) then
+        return
+      end
+      pending[client.name] = nil
+      back = back + 1
+      vim.notify(string.format("%s attached (%d/%d)", client.name, back, total), vim.log.levels.INFO, title)
+      if back == total then
+        vim.api.nvim_del_augroup_by_id(attach_group)
+      end
+    end,
+  })
+
+  vim.cmd("lsp restart " .. table.concat(names, " "))
+end, { desc = "Reload changed buffers and restart LSP clients" })
+
 -- Plugin: gitsigns (navigate hunk to the previous / next)
 keymap.set("n", "<C-;>", function()
   require("gitsigns").nav_hunk("prev")
