@@ -7,6 +7,7 @@ opt.relativenumber = false
 opt.numberwidth = 5
 opt.signcolumn = "yes:2"
 opt.foldcolumn = "1"
+opt.fileencodings = { "ucs-bom", "utf-8", "cp932", "default", "latin1" }
 
 -- Show Copilot suggestions as inline ghost text (copilot.lua) instead of
 -- blink.cmp completion items, so <Tab> always accepts the visible suggestion
