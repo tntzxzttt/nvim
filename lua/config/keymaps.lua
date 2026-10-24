@@ -8,7 +8,28 @@ local opts = { noremap = true, silent = true }
 -- Suppress keys that have no action in Insert / Cmdline mode
 -- Neovim recognizes these key codes but has nothing to do with them, so it
 -- inserts the key name itself as text (e.g. "<S-Del>"). Add more as they show up.
-keymap.set({ "i", "c" }, "<S-Del>", "<Nop>", opts)
+for _, key in ipairs({
+  "<S-Del>",
+  "<D-e>",
+  "<D-r>",
+  "<D-y>",
+  "<D-u>",
+  "<D-i>",
+  "<D-o>",
+  "<D-p>",
+  "<D-a>",
+  "<D-s>",
+  "<D-g>",
+  "<D-j>",
+  "<D-k>",
+  "<D-l>",
+  "<D-;>",
+  "<D-x>",
+  "<D-c>",
+  "<D-b>",
+}) do
+  keymap.set({ "i", "c" }, key, "<Nop>", opts)
+end
 
 -- Move cursor in Insert Mode
 keymap.set("i", "<C-p>", "<Up>", opts)
