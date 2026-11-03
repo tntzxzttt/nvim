@@ -67,17 +67,8 @@ return {
     -- rename or refactor upstream would raise inside a libuv callback, where
     -- the cause is hard to connect to a stale status column. Report it once and
     -- leave the built-in behaviour (15 minute cache, or R in the explorer).
-    local function refresh(root)
-      if not _G.Snacks then
-        return -- snacks is not on the runtimepath yet
-      end
-
-      local ok, err = pcall(function()
-        require("snacks.explorer.git").refresh(root)
-        require("snacks.explorer.watch").refresh()
-      end)
-
-      if ok or notified then
+    local function report(err)
+      if notified then
         return
       end
 
@@ -92,6 +83,72 @@ return {
           { title = "snacks explorer git status watch" }
         )
       end)
+    end
+
+    local function refresh(root)
+      if not _G.Snacks then
+        return -- snacks is not on the runtimepath yet
+      end
+
+      local ok, err = pcall(function()
+        require("snacks.explorer.git").refresh(root)
+        require("snacks.explorer.watch").refresh()
+      end)
+
+      if not ok then
+        report(err)
+      end
+    end
+
+    -- snacks.explorer.git._update clears status and ignored on every node
+    -- before applying a new `git status`, but not dir_status, which is set when
+    -- git reports a whole directory ("?? dir/", "!! dir/") and is inherited by
+    -- every child without a status of its own. Once that directory is added or
+    -- un-ignored, its children keep showing the old status, and R does not help
+    -- because it reuses the same nodes; only a restart rebuilds them. Clear
+    -- dir_status alongside the other two.
+    local function patch_dir_status()
+      local ok, err = pcall(function()
+        local Git = require("snacks.explorer.git")
+        local Tree = require("snacks.explorer.tree")
+        local update = Git._update
+        assert(type(update) == "function", "snacks.explorer.git._update is missing")
+
+        Git._update = function(cwd, results)
+          local before = {} ---@type table<snacks.picker.explorer.Node, string>
+
+          local cleared, clear_err = pcall(function()
+            Tree:walk(Tree:find(cwd), function(n)
+              if n.dir_status then
+                before[n] = n.dir_status
+                n.dir_status = nil
+              end
+            end, { all = true })
+          end)
+
+          if not cleared then
+            report(clear_err)
+          end
+
+          if update(cwd, results) then
+            return true
+          end
+
+          -- _update compares only status and ignored, so report a change that
+          -- touched dir_status alone as well.
+          for n, status in pairs(before) do
+            if n.dir_status ~= status then
+              return true
+            end
+          end
+
+          return false
+        end
+      end)
+
+      if not ok then
+        report(err)
+      end
     end
 
     -- Start a watch on path that refreshes root once events stop arriving for
@@ -158,9 +215,20 @@ return {
       )
     end
 
+    local group = vim.api.nvim_create_augroup("snacks_explorer_git_status_watch", { clear = true })
+
     vim.api.nvim_create_autocmd({ "VimEnter", "DirChanged" }, {
-      group = vim.api.nvim_create_augroup("snacks_explorer_git_status_watch", { clear = true }),
+      group = group,
       callback = watch_repo,
+    })
+
+    -- An update that runs before this only leaves a stale dir_status behind,
+    -- and the first patched update clears it.
+    vim.api.nvim_create_autocmd("User", {
+      group = group,
+      pattern = "VeryLazy",
+      once = true,
+      callback = patch_dir_status,
     })
   end,
   keys = {
