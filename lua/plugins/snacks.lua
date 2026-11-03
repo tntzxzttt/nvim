@@ -32,7 +32,15 @@ return {
   -- .git/modules/<name>/, so the event never fires: operations that leave the
   -- worktree untouched (add, commit, checkout, stash) keep showing a stale
   -- status until the 15 minute cache expires or the explorer is refreshed by
-  -- hand. Watch the resolved gitdir instead.
+  -- hand. Watch the resolved gitdir instead. Even in a plain repository the
+  -- built-in watch reacts to index alone and misses operations that only move
+  -- the branch (reset --soft), so the gitdir is watched there as well.
+  --
+  -- The worktree side has a similar gap in every repository: the built-in
+  -- watches on the root and on open directories are not recursive, so an
+  -- edit made outside nvim inside a collapsed directory goes unnoticed, and
+  -- neither the file nor its parent directories change status. Watch the
+  -- whole worktree recursively as well.
   init = function()
     local uv = vim.uv or vim.loop
     local watches = {} ---@type table<string, { handle: uv.uv_fs_event_t, timer: uv.uv_timer_t }>
@@ -47,12 +55,36 @@ return {
     -- event, not as a write to index itself.
     local triggers = { ["index"] = true, ["index.lock"] = true, ["HEAD"] = true, ["ORIG_HEAD"] = true }
 
+    -- Paths under .git change on every git operation. The gitdir watch already
+    -- handles the ones that matter.
+    local function in_dotgit(file)
+      return file == ".git" or vim.startswith(file, ".git/")
+    end
+
     local notified = false
 
     -- snacks.explorer.git and snacks.explorer.watch are internal modules, so a
     -- rename or refactor upstream would raise inside a libuv callback, where
     -- the cause is hard to connect to a stale status column. Report it once and
     -- leave the built-in behaviour (15 minute cache, or R in the explorer).
+    local function report(err)
+      if notified then
+        return
+      end
+
+      notified = true
+
+      vim.schedule(function()
+        vim.notify(
+          ("The explorer git status watch failed, so git status will go stale.\nsnacks internals may have changed: %s"):format(
+            err
+          ),
+          vim.log.levels.ERROR,
+          { title = "snacks explorer git status watch" }
+        )
+      end)
+    end
+
     local function refresh(root)
       if not _G.Snacks then
         return -- snacks is not on the runtimepath yet
@@ -63,24 +95,93 @@ return {
         require("snacks.explorer.watch").refresh()
       end)
 
-      if ok or notified then
+      if not ok then
+        report(err)
+      end
+    end
+
+    -- snacks.explorer.git._update clears status and ignored on every node
+    -- before applying a new `git status`, but not dir_status, which is set when
+    -- git reports a whole directory ("?? dir/", "!! dir/") and is inherited by
+    -- every child without a status of its own. Once that directory is added or
+    -- un-ignored, its children keep showing the old status, and R does not help
+    -- because it reuses the same nodes; only a restart rebuilds them. Clear
+    -- dir_status alongside the other two.
+    local function patch_dir_status()
+      local ok, err = pcall(function()
+        local Git = require("snacks.explorer.git")
+        local Tree = require("snacks.explorer.tree")
+        local update = Git._update
+        assert(type(update) == "function", "snacks.explorer.git._update is missing")
+
+        Git._update = function(cwd, results)
+          local before = {} ---@type table<snacks.picker.explorer.Node, string>
+
+          local cleared, clear_err = pcall(function()
+            Tree:walk(Tree:find(cwd), function(n)
+              if n.dir_status then
+                before[n] = n.dir_status
+                n.dir_status = nil
+              end
+            end, { all = true })
+          end)
+
+          if not cleared then
+            report(clear_err)
+          end
+
+          if update(cwd, results) then
+            return true
+          end
+
+          -- _update compares only status and ignored, so report a change that
+          -- touched dir_status alone as well.
+          for n, status in pairs(before) do
+            if n.dir_status ~= status then
+              return true
+            end
+          end
+
+          return false
+        end
+      end)
+
+      if not ok then
+        report(err)
+      end
+    end
+
+    -- Start a watch on path that refreshes root once events stop arriving for
+    -- SETTLE_MS. should_refresh receives the changed path relative to path,
+    -- or nil when the platform cannot tell.
+    local function watch(path, root, flags, should_refresh)
+      if watches[path] then
         return
       end
 
-      notified = true
+      local w = { handle = assert(uv.new_fs_event()), timer = assert(uv.new_timer()) }
 
-      vim.schedule(function()
-        vim.notify(
-          ("The explorer gitdir watch failed, so git status will go stale.\nsnacks internals may have changed: %s"):format(
-            err
-          ),
-          vim.log.levels.ERROR,
-          { title = "snacks explorer gitdir watch" }
-        )
+      local ok = w.handle:start(path, flags, function(_, file)
+        if not should_refresh(file) then
+          return
+        end
+
+        w.timer:stop()
+        w.timer:start(SETTLE_MS, 0, function()
+          refresh(root)
+        end)
       end)
+
+      if not ok then
+        w.handle:close()
+        w.timer:close()
+        return
+      end
+
+      watches[path] = w
     end
 
-    local function watch_gitdir()
+    local function watch_repo()
       local cwd = uv.cwd()
 
       vim.system(
@@ -94,32 +195,40 @@ return {
           local lines = vim.split(vim.trim(out.stdout), "\n")
           local root, gitdir = lines[1], lines[2]
 
-          -- A plain repository keeps its index inside the worktree, where the
-          -- built-in watch already sees it.
-          if not root or not gitdir or gitdir == root .. "/.git" or watches[gitdir] then
+          if not root or not gitdir then
             return
           end
 
-          local watch = { handle = assert(uv.new_fs_event()), timer = assert(uv.new_timer()) }
-          watches[gitdir] = watch
+          -- libuv honours recursive only on macOS and Windows. Elsewhere this
+          -- duplicates the built-in watch on the root, which is harmless.
+          watch(root, root, { recursive = true }, function(file)
+            return not file or not in_dotgit(file)
+          end)
 
-          watch.handle:start(gitdir, {}, function(_, file)
-            if not file or not triggers[vim.fs.basename(file)] then
-              return
-            end
-
-            watch.timer:stop()
-            watch.timer:start(SETTLE_MS, 0, function()
-              refresh(root)
-            end)
+          -- Watch the gitdir in a plain repository too. The built-in watch on
+          -- "<root>/.git" reacts to index alone, so operations that only move
+          -- the branch, such as reset --soft, would go unnoticed there.
+          watch(gitdir, root, {}, function(file)
+            return file ~= nil and triggers[vim.fs.basename(file)] == true
           end)
         end)
       )
     end
 
+    local group = vim.api.nvim_create_augroup("snacks_explorer_git_status_watch", { clear = true })
+
     vim.api.nvim_create_autocmd({ "VimEnter", "DirChanged" }, {
-      group = vim.api.nvim_create_augroup("snacks_explorer_gitdir_watch", { clear = true }),
-      callback = watch_gitdir,
+      group = group,
+      callback = watch_repo,
+    })
+
+    -- An update that runs before this only leaves a stale dir_status behind,
+    -- and the first patched update clears it.
+    vim.api.nvim_create_autocmd("User", {
+      group = group,
+      pattern = "VeryLazy",
+      once = true,
+      callback = patch_dir_status,
     })
   end,
   keys = {
