@@ -32,7 +32,9 @@ return {
   -- .git/modules/<name>/, so the event never fires: operations that leave the
   -- worktree untouched (add, commit, checkout, stash) keep showing a stale
   -- status until the 15 minute cache expires or the explorer is refreshed by
-  -- hand. Watch the resolved gitdir instead.
+  -- hand. Watch the resolved gitdir instead. Even in a plain repository the
+  -- built-in watch reacts to index alone and misses operations that only move
+  -- the branch (reset --soft), so the gitdir is watched there as well.
   --
   -- The worktree side has a similar gap in every repository: the built-in
   -- watches on the root and on open directories are not recursive, so an
@@ -146,13 +148,12 @@ return {
             return not file or not in_dotgit(file)
           end)
 
-          -- A plain repository keeps its index inside the worktree, where the
-          -- built-in watch already sees it.
-          if gitdir ~= root .. "/.git" then
-            watch(gitdir, root, {}, function(file)
-              return file ~= nil and triggers[vim.fs.basename(file)] == true
-            end)
-          end
+          -- Watch the gitdir in a plain repository too. The built-in watch on
+          -- "<root>/.git" reacts to index alone, so operations that only move
+          -- the branch, such as reset --soft, would go unnoticed there.
+          watch(gitdir, root, {}, function(file)
+            return file ~= nil and triggers[vim.fs.basename(file)] == true
+          end)
         end)
       )
     end
