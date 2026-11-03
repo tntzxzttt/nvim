@@ -33,6 +33,12 @@ return {
   -- worktree untouched (add, commit, checkout, stash) keep showing a stale
   -- status until the 15 minute cache expires or the explorer is refreshed by
   -- hand. Watch the resolved gitdir instead.
+  --
+  -- The worktree side has a similar gap in every repository: the built-in
+  -- watches on the root and on open directories are not recursive, so an
+  -- edit made outside nvim inside a collapsed directory goes unnoticed, and
+  -- neither the file nor its parent directories change status. Watch the
+  -- whole worktree recursively as well.
   init = function()
     local uv = vim.uv or vim.loop
     local watches = {} ---@type table<string, { handle: uv.uv_fs_event_t, timer: uv.uv_timer_t }>
@@ -46,6 +52,12 @@ return {
     -- included because the index write that ends a commit arrives as a lock
     -- event, not as a write to index itself.
     local triggers = { ["index"] = true, ["index.lock"] = true, ["HEAD"] = true, ["ORIG_HEAD"] = true }
+
+    -- Paths under .git change on every git operation. The gitdir watch already
+    -- handles the ones that matter.
+    local function in_dotgit(file)
+      return file == ".git" or vim.startswith(file, ".git/")
+    end
 
     local notified = false
 
@@ -71,16 +83,46 @@ return {
 
       vim.schedule(function()
         vim.notify(
-          ("The explorer gitdir watch failed, so git status will go stale.\nsnacks internals may have changed: %s"):format(
+          ("The explorer git status watch failed, so git status will go stale.\nsnacks internals may have changed: %s"):format(
             err
           ),
           vim.log.levels.ERROR,
-          { title = "snacks explorer gitdir watch" }
+          { title = "snacks explorer git status watch" }
         )
       end)
     end
 
-    local function watch_gitdir()
+    -- Start a watch on path that refreshes root once events stop arriving for
+    -- SETTLE_MS. should_refresh receives the changed path relative to path,
+    -- or nil when the platform cannot tell.
+    local function watch(path, root, flags, should_refresh)
+      if watches[path] then
+        return
+      end
+
+      local w = { handle = assert(uv.new_fs_event()), timer = assert(uv.new_timer()) }
+
+      local ok = w.handle:start(path, flags, function(_, file)
+        if not should_refresh(file) then
+          return
+        end
+
+        w.timer:stop()
+        w.timer:start(SETTLE_MS, 0, function()
+          refresh(root)
+        end)
+      end)
+
+      if not ok then
+        w.handle:close()
+        w.timer:close()
+        return
+      end
+
+      watches[path] = w
+    end
+
+    local function watch_repo()
       local cwd = uv.cwd()
 
       vim.system(
@@ -94,32 +136,30 @@ return {
           local lines = vim.split(vim.trim(out.stdout), "\n")
           local root, gitdir = lines[1], lines[2]
 
-          -- A plain repository keeps its index inside the worktree, where the
-          -- built-in watch already sees it.
-          if not root or not gitdir or gitdir == root .. "/.git" or watches[gitdir] then
+          if not root or not gitdir then
             return
           end
 
-          local watch = { handle = assert(uv.new_fs_event()), timer = assert(uv.new_timer()) }
-          watches[gitdir] = watch
-
-          watch.handle:start(gitdir, {}, function(_, file)
-            if not file or not triggers[vim.fs.basename(file)] then
-              return
-            end
-
-            watch.timer:stop()
-            watch.timer:start(SETTLE_MS, 0, function()
-              refresh(root)
-            end)
+          -- libuv honours recursive only on macOS and Windows. Elsewhere this
+          -- duplicates the built-in watch on the root, which is harmless.
+          watch(root, root, { recursive = true }, function(file)
+            return not file or not in_dotgit(file)
           end)
+
+          -- A plain repository keeps its index inside the worktree, where the
+          -- built-in watch already sees it.
+          if gitdir ~= root .. "/.git" then
+            watch(gitdir, root, {}, function(file)
+              return file ~= nil and triggers[vim.fs.basename(file)] == true
+            end)
+          end
         end)
       )
     end
 
     vim.api.nvim_create_autocmd({ "VimEnter", "DirChanged" }, {
-      group = vim.api.nvim_create_augroup("snacks_explorer_gitdir_watch", { clear = true }),
-      callback = watch_gitdir,
+      group = vim.api.nvim_create_augroup("snacks_explorer_git_status_watch", { clear = true }),
+      callback = watch_repo,
     })
   end,
   keys = {
