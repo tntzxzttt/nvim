@@ -52,7 +52,7 @@ Examples:
 
 - `feat(commands): add layout-preserving :Bdelete command (#12)`
 - `fix(keymaps): resolve keymap conflict (#3)`
-- `chore: update dependencies`  ← no scope for non-configuration changes
+- `chore: update dependencies` ← no scope for non-configuration changes
 
 ### Pull Requests
 
