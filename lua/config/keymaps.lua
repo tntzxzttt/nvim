@@ -84,6 +84,9 @@ keymap.set("n", "<C-w><right>", "<C-w>>")
 keymap.set("n", "<C-w><up>", "<C-w>+")
 keymap.set("n", "<C-w><down>", "<C-w>-")
 
+-- Quit window
+keymap.set("n", "<C-q>", "<cmd>q<CR>", { desc = "Quit window" })
+
 -- Diagnostic
 keymap.set("n", "<C-l>", function()
   vim.diagnostic.jump({ count = 1 })
