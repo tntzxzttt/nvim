@@ -25,6 +25,64 @@ return {
         files = { hidden = true, ignored = true },
       },
     },
+    image = {
+      enabled = true,
+      doc = {
+        -- Overlay rendered math and Mermaid diagrams on their source, which
+        -- shows again while the cursor is on those lines. The default conceals
+        -- math alone and renders diagrams below their code blocks.
+        conceal = function(_, type)
+          return type == "math" or type == "chart"
+        end,
+      },
+      convert = {
+        -- The default arguments plus -p, which points mmdc at the installed
+        -- Chrome instead of a Chromium that puppeteer downloads and never
+        -- removes (see README.md), and -C, which thickens lines
+        -- that would otherwise vanish when the diagram is scaled to fit.
+        mermaid = function()
+          local theme = vim.o.background == "light" and "neutral" or "dark"
+          local dir = vim.fn.stdpath("config") .. "/mmdc"
+          return {
+            "-i",
+            "{src}",
+            "-o",
+            "{file}",
+            "-b",
+            "transparent",
+            "-t",
+            theme,
+            "-s",
+            "{scale}",
+            "-p",
+            dir .. "/puppeteer-config.json",
+            "-C",
+            dir .. "/mermaid.css",
+          }
+        end,
+      },
+      -- A list given here replaces the default one instead of extending it, so
+      -- repeat the defaults and append svg and ico.
+      --
+      -- Video formats are left out. ImageMagick decodes them through ffmpeg
+      -- into WebP, which fails on an ffmpeg built without a WebP encoder, and
+      -- even when it works the result is the first frame alone.
+      formats = {
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "bmp",
+        "webp",
+        "tiff",
+        "heic",
+        "avif",
+        "pdf",
+        "icns",
+        "svg",
+        "ico",
+      },
+    },
   },
   -- snacks.explorer refreshes its git status column from an fs_event on
   -- "<root>/.git", looking for writes to the index. In a git submodule that
@@ -229,6 +287,45 @@ return {
       pattern = "VeryLazy",
       once = true,
       callback = patch_dir_status,
+    })
+
+    -- A concealed image taller in source lines than in rows (a $$ block whose
+    -- equation fits in two rows, say) hides the leftover lines with
+    -- conceal_lines. When the cursor reaches the block, snacks.image hides the
+    -- image to show the source and clears conceal, but not conceal_lines, so
+    -- those lines stay hidden while being edited. Clear it as well.
+    -- Upstream: folke/snacks.nvim#2569, fixed by the unmerged #2911; drop this
+    -- once that lands.
+    vim.api.nvim_create_autocmd("User", {
+      pattern = "VeryLazy",
+      once = true,
+      callback = function()
+        local ok, err = pcall(function()
+          local Placement = require("snacks.image.placement")
+          local render = Placement._render
+          assert(type(render) == "function", "snacks.image.placement._render is missing")
+
+          Placement._render = function(self, extmarks)
+            if self.hidden then
+              for _, e in ipairs(extmarks) do
+                e.conceal_lines = nil
+              end
+            end
+
+            return render(self, extmarks)
+          end
+        end)
+
+        if not ok then
+          vim.notify(
+            ("Patching snacks.image failed, so lines under a hidden image may stay concealed.\nsnacks internals may have changed: %s"):format(
+              err
+            ),
+            vim.log.levels.ERROR,
+            { title = "snacks image conceal_lines patch" }
+          )
+        end
+      end,
     })
   end,
   keys = {
