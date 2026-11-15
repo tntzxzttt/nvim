@@ -25,6 +25,30 @@ return {
         files = { hidden = true, ignored = true },
       },
     },
+    image = {
+      enabled = true,
+      -- A list given here replaces the default one instead of extending it, so
+      -- repeat the defaults and append svg and ico.
+      --
+      -- Video formats are left out. ImageMagick decodes them through ffmpeg
+      -- into WebP, which fails on an ffmpeg built without a WebP encoder, and
+      -- even when it works the result is the first frame alone.
+      formats = {
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "bmp",
+        "webp",
+        "tiff",
+        "heic",
+        "avif",
+        "pdf",
+        "icns",
+        "svg",
+        "ico",
+      },
+    },
   },
   -- snacks.explorer refreshes its git status column from an fs_event on
   -- "<root>/.git", looking for writes to the index. In a git submodule that
