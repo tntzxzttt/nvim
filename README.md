@@ -12,11 +12,15 @@ My personal Neovim configuration, based on [LazyVim](https://github.com/LazyVim/
 Depending on the results of `:checkhealth`, install the following dependency tools.
 
 ```sh
-brew install tree-sitter tree-sitter-cli ripgrep fd ghostscript tectonic
-npm install -g @mermaid-js/mermaid-cli
+brew install tree-sitter tree-sitter-cli ripgrep fd ghostscript tectonic mermaid-cli
 
 # brew install luarocks
 ```
+
+Rendering Mermaid diagrams also requires Google Chrome.
+`mmdc/puppeteer-config.json` points mermaid-cli at the installed Chrome,
+so puppeteer never downloads a Chromium of its own into `~/.cache/puppeteer`,
+which no uninstall removes.
 
 Why is the LuaRocks installation commented out? That's because it is not strictly recommended.
 

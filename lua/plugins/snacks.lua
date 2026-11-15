@@ -27,6 +27,40 @@ return {
     },
     image = {
       enabled = true,
+      doc = {
+        -- Overlay rendered math and Mermaid diagrams on their source, which
+        -- shows again while the cursor is on those lines. The default conceals
+        -- math alone and renders diagrams below their code blocks.
+        conceal = function(_, type)
+          return type == "math" or type == "chart"
+        end,
+      },
+      convert = {
+        -- The default arguments plus -p, which points mmdc at the installed
+        -- Chrome instead of a Chromium that puppeteer downloads and never
+        -- removes (see README.md), and -C, which thickens lines
+        -- that would otherwise vanish when the diagram is scaled to fit.
+        mermaid = function()
+          local theme = vim.o.background == "light" and "neutral" or "dark"
+          local dir = vim.fn.stdpath("config") .. "/mmdc"
+          return {
+            "-i",
+            "{src}",
+            "-o",
+            "{file}",
+            "-b",
+            "transparent",
+            "-t",
+            theme,
+            "-s",
+            "{scale}",
+            "-p",
+            dir .. "/puppeteer-config.json",
+            "-C",
+            dir .. "/mermaid.css",
+          }
+        end,
+      },
       -- A list given here replaces the default one instead of extending it, so
       -- repeat the defaults and append svg and ico.
       --

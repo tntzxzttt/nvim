@@ -1,0 +1,15 @@
+/*
+ * snacks.image fits a diagram into a whole number of terminal rows, so the
+ * terminal scales it down slightly and drops pixel rows to do so. A 1px line
+ * on a dropped row disappears. Draw normal edges and node outlines at 2px so
+ * that one pixel always survives. Thick (==>) and dotted (-.->) edges keep
+ * their own widths.
+ */
+.edge-thickness-normal,
+.node rect,
+.node polygon,
+.node circle,
+.node ellipse,
+.node path {
+  stroke-width: 2px !important;
+}
