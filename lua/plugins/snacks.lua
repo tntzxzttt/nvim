@@ -288,6 +288,45 @@ return {
       once = true,
       callback = patch_dir_status,
     })
+
+    -- A concealed image taller in source lines than in rows (a $$ block whose
+    -- equation fits in two rows, say) hides the leftover lines with
+    -- conceal_lines. When the cursor reaches the block, snacks.image hides the
+    -- image to show the source and clears conceal, but not conceal_lines, so
+    -- those lines stay hidden while being edited. Clear it as well.
+    -- Upstream: folke/snacks.nvim#2569, fixed by the unmerged #2911; drop this
+    -- once that lands.
+    vim.api.nvim_create_autocmd("User", {
+      pattern = "VeryLazy",
+      once = true,
+      callback = function()
+        local ok, err = pcall(function()
+          local Placement = require("snacks.image.placement")
+          local render = Placement._render
+          assert(type(render) == "function", "snacks.image.placement._render is missing")
+
+          Placement._render = function(self, extmarks)
+            if self.hidden then
+              for _, e in ipairs(extmarks) do
+                e.conceal_lines = nil
+              end
+            end
+
+            return render(self, extmarks)
+          end
+        end)
+
+        if not ok then
+          vim.notify(
+            ("Patching snacks.image failed, so lines under a hidden image may stay concealed.\nsnacks internals may have changed: %s"):format(
+              err
+            ),
+            vim.log.levels.ERROR,
+            { title = "snacks image conceal_lines patch" }
+          )
+        end
+      end,
+    })
   end,
   keys = {
     {
